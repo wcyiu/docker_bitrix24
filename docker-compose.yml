@@ -22,9 +22,14 @@ services:
             - php
         networks:
             - bitrix
+            - default
+        labels:
+            - "traefik.enable=true"
+            - "traefik.http.routers.nginx-dev1.rule=Host(`${HOST}`)"
+            - "traefik.http.services.nginx-dev1.loadbalancer.server.port=80"
+            #- "traefik.http.routers.nginx-dev1.tls=true"
+            - "traefik.docker.network=traefik-net"
         restart: always
-        ports:
-            - '${INTERFACE}:80:80'
     db:
         build: ./${DB_SERVER_TYPE}
         platform: linux/amd64
@@ -81,12 +86,19 @@ services:
             - redis
         networks:
             - bitrix
+            - default
         environment:
             - REDIS_HOST=redis
             - LISTEN_HOSTNAME=0.0.0.0
             - LISTEN_PORT=80
             - SECURITY_KEY=${SECURITY_KEY}
             - MODE=sub
+        labels:
+            - "traefik.enable=true"
+            - "traefik.http.routers.nginx-dev2.rule=Host(`bitrix24-sub.docker.localhost`)"
+            - "traefik.http.services.nginx-dev2.loadbalancer.server.port=80"
+            #- "traefik.http.routers.nginx-dev2.tls=true"
+            - "traefik.docker.network=traefik-net"
 
     push-server-pub:
         image: ikarpovich/bitrix-push-server
@@ -110,6 +122,7 @@ services:
 
     mailhog:
         image: mailhog/mailhog
+        container_name: mailhog
         ports:
             - "8025:8025"
             - "1025:1025"
@@ -120,6 +133,7 @@ services:
         image: docker:edge
         volumes:
             - /var/run/docker.sock:/var/run/docker.sock
+        container_name: cronjobber
         command: >
             sh -c "
             echo '* * * * * docker exec bx-php php -f /var/www/bitrix/bitrix/modules/main/tools/cron_events.php' > /etc/crontabs/root
@@ -136,6 +150,9 @@ volumes:
         driver: local
 
 networks:
+    default:
+        external:
+            name: traefik-net
     bitrix:
         driver: bridge
         ipam:
